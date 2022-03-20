@@ -1,0 +1,102 @@
+﻿$(document).ready(function () {
+    $("#login-form").on("submit", function () {
+        if ($("#username").val().charAt(0) === "+" && isNumber($("#username").val().substring(1))) {
+            $("#alert-login").show();
+
+            return false;
+        }
+    });
+});
+
+function isNumber(n) {
+    return /^-?[\d.]+(?:e-?\d+)?$/.test(n);
+}
+
+var err_mesage = "";
+$.validator.addMethod(
+    "filesize",
+    function (value, element, arg) {
+        err_mesage = $(element).val();
+        if ($(element).val() != 0) {
+            return false;
+        } else {
+            return true;
+        }
+    },
+    function (params, element) {
+        return $(element).val();
+    },
+);
+
+$.validator.messages["required"] = translations["form_error_required"];
+$.validator.messages["email"] = translations["form_error_valid_email"];
+$.validator.messages["maxlength"] = translations["form_error_maxlength"];
+
+$("#report_bug_form").validate({
+    rules: {
+        summary: {
+            required: true,
+            maxlength: 128,
+        },
+        description: {
+            required: true,
+        },
+        steps_to_reproduce: {
+            required: true,
+        },
+        car_file_size: {
+            filesize: 1,
+        },
+    },
+});
+
+$("#update_bug_form").validate({
+    rules: {
+        summary: {
+            required: true,
+            maxlength: 128,
+        },
+        description: {
+            required: true,
+        },
+        steps_to_reproduce: {
+            required: true,
+        },
+        car_file_size: {
+            filesize: 1,
+        },
+    },
+});
+
+$("#form_tell_us_whats_wrong").validate({
+    submitHandler: function () {
+        var data = $("#form_tell_us_whats_wrong").serialize();
+        $("#form_submit").button("loading");
+        $.post("contact_form.php", { data: data }, function (response) {
+            $(".response_form").remove();
+            $("#form_text").val("");
+            $("#form_tell_us_whats_wrong").hide();
+            $("#form_tell_us_whats_wrong").before("<div class='col-sm-12 response_form'>" + response + "</div>");
+            $("#form_submit").button("reset");
+        });
+    },
+    rules: {
+        form_name: {
+            required: true,
+            maxlength: 200,
+        },
+        form_email: {
+            required: true,
+            email: true,
+            maxlength: 100,
+        },
+        form_text: {
+            required: true,
+        },
+    },
+});
+
+$("#tell_us_whats_wrong").on("hidden.bs.modal", function (e) {
+    $(".response_form").remove();
+    $("#form_tell_us_whats_wrong").show();
+});

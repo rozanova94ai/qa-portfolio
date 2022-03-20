@@ -1,0 +1,151 @@
+$(document).ready(function(){
+
+    //optimize this?
+    
+    $(".my_select").chosen({no_results_text:'Enter more than 3 characters to start search'});
+    $("#search_by").chosen({disable_search: true});
+
+    $('body').on('click','#search_by_user_chosen', function () {
+        if($('.chosen-results').text()=='') {
+            $('.chosen-results').html('Enter more than 3 characters to start search');
+        }
+    });
+
+
+    $('form[name="user_form"]').keyup(function(){
+        var text = $('.chosen-search input').val();
+
+        var selected_option = $( "#search_by option:selected" ).val();
+
+        if (text.length>2) {
+
+            $.ajax({
+                type: "POST",
+                url: "/searchByName.php",
+                data: {
+                    name: text,
+                    option: selected_option
+                },
+
+                beforeSend: function(data) {
+                    $('.chosen-results').html('Loading, please wait...');
+                },
+                success: function (result) {
+
+                    $('.chosen-results').html('');
+
+                    var json = $.parseJSON(result);
+
+                    if ($.isEmptyObject(json)){
+                        $('.chosen-results').html('No result found');
+                        return;
+                    }
+
+                    $('.my_select').html('');
+
+                    $.each(json, function (index, value_test) {
+                        $('.my_select').append('<option id="' + index + '" value="' + value_test + '">' + value_test + '</option>');
+                    });
+
+                    var text2 = $('.chosen-search input').val();
+                    $(".my_select").trigger("chosen:updated");
+                    console.log(text2);
+                    $('.active-result').removeClass('.result-selected');
+                    $('.chosen-search input').val(text2);
+                    $("#search_by").trigger("chosen:updated");
+                }
+            });
+        }
+        else
+        {
+            $('.chosen-results').html('Enter more than 3 characters to start search');
+        }
+    });
+
+
+    $('#search_by_user_chosen').on('click', 'li', function(){ // вывод блока с проектами пользователя
+        var text = $(this).closest('li').html();
+
+        $.ajax({
+            type: "POST",
+            url: "/manage_user_project_view.php",
+            data: {
+                username: text
+            },
+            success: function (result) {
+                console.log(result);
+                $('.project_view').html(result);
+                $('form').attr('action', 'javascript:void(null)');
+                $('form').attr('class', 'remove_form');
+                $('select[name="access_level"]').chosen({disable_search: true});
+                $('.chosen_select').chosen();
+                //$(".my_select").trigger("chosen:updated");
+            }
+        });
+
+    });
+
+    $('body').on('submit', '.remove_form', function(){ // удаление проекта
+        var form = $(this); 
+       
+        var data = form.serialize(); 
+        var project_id = form.find('input[name="project_id"]').val();
+        var user_id = form.find('input[name="user_id"]').val();
+        console.log(project_id);
+        console.log(user_id);
+        $.ajax({ 
+            type: 'POST', 
+            url: '/manage_user_proj_add_and_remove.php', 
+            data: {
+                project_id: project_id,
+                user_id: user_id,
+                remove_project: true
+            }, 
+            success: function(result) { 
+                console.log(result);
+                $('.project_view').html(result);
+                $('form').attr('action', 'javascript:void(null)');
+                $('form').attr('class', 'remove_form');
+                $('.chosen_select').chosen();
+                $('select[name="access_level"]').chosen({disable_search: true});
+            }
+        });        
+        return false; 
+    });
+
+
+
+
+    $('body').on('click', '#submit_butt', function(){ // добавление проекта
+
+        $('.button').attr('type', 'button');
+        var arr = $(".chosen_select").chosen().val();
+        var access_level = $('select[name="access_level"]').val();
+        var user = $('select[name="search_by_user"]').val();
+
+        $.ajax({
+            type: "POST",
+            url: "/manage_user_proj_add_and_remove.php",
+            data: {
+                user: user,
+                access_level: access_level,
+                project_id: arr,
+                add_project: true
+            },
+            success: function (result) {
+                console.log(result);
+                $('.project_view').html(result);
+                $('form').attr('action', 'javascript:void(null)');
+                $('form').attr('class', 'remove_form');
+                $('.chosen_select').chosen();
+                $('select[name="access_level"]').chosen({disable_search: true});
+                //alert(result);
+            }
+        });
+
+        return false;
+    });
+
+
+
+});

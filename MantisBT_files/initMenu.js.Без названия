@@ -1,0 +1,333 @@
+var getUrlParameter = function getUrlParameter(sParam) {
+    var sPageURL = decodeURIComponent(window.location.search.substring(1)),
+        sURLVariables = sPageURL.split('&'),
+        sParameterName,
+        i;
+
+    for (i = 0; i < sURLVariables.length; i++) {
+        sParameterName = sURLVariables[i].split('=');
+
+        if (sParameterName[0] === sParam) {
+            return sParameterName[1] === undefined ? true : sParameterName[1];
+        }
+    }
+
+    return undefined;
+};
+
+var menu_opened = false;
+function initMenu() {
+    if(menu_opened) {
+        $(".tree-menu-selected").click();
+    } else {
+        menu_opened = true;
+        $('#project_tree').jstree({
+            'core': {
+                'data': {
+                    'async': true,
+                    'url': '/jsTreeMenu/getMenu.php?operation=get_node',
+                    'data': function (node) {
+                        return {'id': node.id};
+
+                    }
+                },
+                'check_callback': function (o, n, p, i, m) {
+                    if (m && m.dnd && m.pos !== 'i') {
+                        return false;
+                    }
+                    return true;
+                },
+                'themes': {
+                    'responsive': true,
+                    'stripes': false
+                }
+            },
+            "search": {
+                "case_insensitive": true
+            },
+            'types': {
+                'default': {'icon': 'folder'},
+                'file': {'valid_children': [], 'icon': 'file'}
+            },
+            'unique': {
+                'duplicate': function (name, counter) {
+                    return name + ' ' + counter;
+                }
+            },
+            'plugins': ['state', 'types', 'unique', 'search']
+        }).on('state_ready.jstree', function (e, data) {
+            $('.tree-menu-selected').show();
+            var text = $('#project_tree li[selected_project="true"] a:first').text();
+
+            if (text.length) {
+                $(".tree-menu-selected").html(text);
+
+            } else if (getUrlParameter('proj') !== undefined) {
+                $('#project_tree').jstree().select_node((getUrlParameter('proj')));
+                var el = $('#project_tree').jstree().get_node((getUrlParameter('proj')));
+                console.log(el);
+                $(".tree-menu-selected").html(el.text);
+            }
+
+            //http://local.bt-w/?projectID=8645
+            //hack to deselect node
+            $('.jstree-clicked').removeClass('jstree-clicked');
+            $('li[selected_project=true]').addClass('jstree-clicked');
+            $("#projects_loader").hide();
+            $('.sel_img').show();
+			selected_tree_menu($(this).closest('.tree-menu'));
+            $.ajax({
+                type: "GET",
+                url: "/jsTreeMenu/getMenu.php?operation=get_current_project",
+                success: function(msg){
+                    $('#'+msg).addClass('jstree-clicked');
+                    $('#project_tree').animate({ scrollTop: $('#'+msg).offset().top-200 }, 'slow');
+                }
+            });
+        });
+    }
+}
+function selected_tree_menu(element){
+	//var element = $(this).closest('.tree-menu');
+	element.toggleClass('active');
+	if(element.hasClass('active')){
+		$('#project_tree').scrollTop(0);
+		var tree = $("#project_tree .jstree-clicked");
+		if(tree && tree.offset() && tree.offset().top) {
+			$('#project_tree').animate({
+				scrollTop: $("#project_tree .jstree-clicked").offset().top - 35
+			}, 0);
+		}
+	}
+}
+$(document).ready(function(){
+    var html = '<div class="tree-menu">'
+                + '<div class="tree-menu-selected"></div>'
+                + '<input name="project_id" class="input-project-id" type="hidden"/>'
+                + '<div id="project_tree"></div>'
+                +'</div>';
+    $('form[name="form_set_project"]').html(html);
+
+    $(document).mouseup(function (e){
+        var container = $(".tree-menu");
+
+        if (!container.is(e.target) // if the target of the click isn't the container...
+            && container.has(e.target).length === 0) // ... nor a descendant of the container
+        {
+            container.removeClass('active');
+        }
+    });
+
+    $(".sel_img").click(function () {
+        initMenu();
+
+        $('.sel_img').hide();
+        $('#projects_loader').show();
+        $("#projct_name").fadeOut();
+    });
+////////////////////////////////////////////////////////////////////
+    $('.tree-menu-selected').click(function(event){
+		event.stopPropagation();
+		selected_tree_menu($(this).closest('.tree-menu'));
+	});
+
+    var ajax_status = {
+        'check' : false
+    };
+
+    $("#project_tree_view").jstree({
+        'core' : {
+            'animation': 500,
+            'data' : {
+                'url' : '/jsTreeMenu/getMenu.php?operation=get_node&long=1',
+                'data' : function (node) {
+                    return { 'id' : node.id };
+                }
+            },
+            'check_callback' : function(o, n, p, i, m) {
+                if(m && m.dnd && m.pos !== 'i') { return false; }
+
+                if(o === "move_node" && m && m.core) {
+                    if(!confirm('Переместить ' + n.text + ' в проект ' + p.text)) {
+                        return false;
+                    }
+
+                    ajax_status.check = false;
+                    var new_parent = p.id;
+                    var node = n.id;
+
+                    $.ajax({
+                        type: "POST",
+                        url: "/move_project.php",
+                        async: false,
+                        data: {
+                            check: true,
+                            node: node,
+                            new_parent: new_parent
+                        },
+                        dataType: 'json',
+                        success: function (result) {
+                            ajax_status.check = result.check;
+
+                            if(!result.check) {
+                                $("#ajax_result").html(result.message);
+                            }
+                        }
+                    });
+
+                    return ajax_status.check;
+                }
+
+                return true;
+            },
+            'themes' : {
+                'responsive' : false,
+                'variant' : 'small',
+                'stripes' : true
+            }
+        },
+        "search" : {
+            "case_insensitive" : true
+        },
+        'types' : {
+            'default' : { 'icon' : 'folder' },
+            'file' : { 'valid_children' : [], 'icon' : 'file' }
+        },
+        'unique' : {
+            'duplicate' : function (name, counter) {
+                return name + ' ' + counter;
+            }
+        },
+        'plugins' : ['state','types','unique','search', 'dnd'],
+    }).on('ready.jstree', function(e, data){
+        $('.tree-menu-selected').show();
+        $(".tree-menu-selected").html($('#project_tree li[selected_project="true"] a:first').text());
+    }).on('move_node.jstree', function (e, data) {
+        /*
+         data.rslt contains:
+         .o - the node being moved
+         .r - the reference node in the move
+         .ot - the origin tree instance
+         .rt - the reference tree instance
+         .p - the position to move to (may be a string - "last", "first", etc)
+         .cp - the calculated position to move to (always a number)
+         .np - the new parent
+         .oc - the original node (if there was a copy)
+         .cy - boolen indicating if the move was a copy
+         .cr - same as np, but if a root node is created this is -1
+         .op - the former parent
+         .or - the node that was previously in the position of the moved node
+         */
+
+        $.ajax({
+            type: "POST",
+            url: "/move_project.php",
+            data: {
+                old_parent: data.old_parent,
+                node: data.node.id,
+                new_parent: data.parent
+            },
+            dataType: 'json',
+            success: function (result) {
+                $("#ajax_result").html(result.message);
+            }
+        });
+
+    });
+
+
+
+
+
+    $('#project_tree').on('click', 'li a', function(){
+        var project_id = $(this).closest('li').attr('id');
+        $(".tree-menu .input-project-id").val(project_id);
+        $(".tree-menu-selected").html($(this).text());
+        $(".tree-menu").removeClass('active');
+        document.forms.form_set_project.submit();
+        return false;
+    });
+
+    $('#project_tree_view').on('click', 'li a', function(){
+        var project_id = $(this).closest('li').attr('id');
+        var projects = project_id.split(';');
+        history.pushState({}, '', $(this).attr("href"));
+        window.location.replace("/manage_proj_edit_page.php?project_id=" + projects[projects.length-1]);
+        return false;
+    });
+
+    $('.tree-menu-selected-stats').show();
+
+
+    $("#project_tree_stats").jstree({
+        'core' : {
+            'data' : {
+                'url' : '/jsTreeMenu/getMenu.php?operation=get_node&long=1',
+                'data' : function (node) {
+                    return { 'id' : node.id };
+                }
+            },
+            'check_callback' : function(o, n, p, i, m) {
+                if(m && m.dnd && m.pos !== 'i') { return false; }
+                return true;
+            },
+            'themes' : {
+                'name': 'proton',
+                'responsive' : false,
+                'variant' : 'small',
+                'stripes' : true
+            }
+        },
+        "search" : {
+            "case_insensitive" : true
+        },
+        'types' : {
+            'default' : { 'icon' : 'folder' },
+            'file' : { 'valid_children' : [], 'icon' : 'file' }
+        },
+        'unique' : {
+            'duplicate' : function (name, counter) {
+                return name + ' ' + counter;
+            }
+        },
+        'plugins' : ['state','types','unique','search']
+    }).on('ready.jstree', function(e, data){
+        $(".tree-menu-selected-stats").html('Выберите проект из списка');
+
+        //http://local.bt-w/?projectID=8645
+        //hack to deselect node
+        $('.jstree-clicked').removeClass('jstree-clicked');
+        $('li[selected_project=true]').addClass('jstree-clicked');
+    });
+
+
+    $('.tree-menu-selected-stats').click(function(event){
+        event.stopPropagation();
+        var element = $(this).closest('.tree-menu');
+        element.toggleClass('active');
+        if(element.hasClass('active')){
+            $('#project_tree_stats').scrollTop(0);
+            var tree = $("#project_tree_stats .jstree-clicked");
+            if(tree && tree.offset() && tree.offset().top) {
+                $('#project_tree_stats').animate({
+                    scrollTop: $("#project_tree_stats .jstree-clicked").offset().top - 35
+                }, 0);
+            }
+        }
+    });
+
+
+
+    $('#project_tree_stats').on('click', 'li a', function(){
+        var project_id1 = $(this).closest('li').attr('id');
+        var projects1 = project_id1.split(';');
+        $(".input-project-id").val(projects1[projects1.length-1]);
+        $(".tree-menu-selected-stats").html($('#project_tree_stats .jstree-clicked').text());
+        var element = $(this).closest('.tree-menu');
+        element.toggleClass('active');
+        return false;
+    });
+
+
+
+});

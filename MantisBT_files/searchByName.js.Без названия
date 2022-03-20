@@ -1,0 +1,103 @@
+$(document).ready(function(){
+
+    /*var html = '<div class="ajaxdiv">'
+        + '<div class="tree-menu-selected">Test Projects</div>'
+        + '<input name="project_id" class="input-project-id" type="hidden" />'
+        + '<div id="project_tree"></div>'
+        +'</div>';*/
+    //$('form[name="form_set_project"]').html(html);
+
+
+    $('form[name="search_form"]').keyup(function(){
+        var text = $('#input_text').val();
+
+        var selected_option = $( "select option:selected" ).val();
+        //alert(selected_option);
+
+        if (text.length>2) {
+            /*var selected_option = $( "select option:selected" );*/
+
+            /*$( "select" ).change(function() {
+                    $( "select option:selected" ).each(function() {
+                        selected_option = $( this ).text();
+                    });
+                alert(selected_option);
+                }).trigger( "change" );*/
+
+            $.ajax({
+                type: "POST",
+                url: "/searchByName.php",
+                data: {
+                    name: $('#input_text').val(),
+                    option: selected_option
+                },
+                success: function (result) {
+                    //alert($('#input_text').val() );
+
+                    $('#ajaxdiv').html('');
+
+                    var json = $.parseJSON(result);
+
+                    if ($.isEmptyObject(json)){
+                        $('#ajaxdiv').html('No result found');
+                        return;
+                    }
+
+                    $('.appended').remove();
+                    $('#ajaxdiv').append('<ul class="appended">');
+
+                    $.each(json, function (index, value) {
+                        $('.appended').append('<li id="' + index + '">' + value + '</li>');
+                        //$('#'+index).html(value);
+                    });
+                }
+            });
+        }
+        else
+        {
+            $('#ajaxdiv').html('Enter more than 3 characters to start search');
+        }
+
+    });
+
+
+    $( "select" ).change(function() {
+        $('form[name="search_form"]').trigger( "keyup" );
+    })
+
+
+
+    $('#ajaxdiv').on('click', 'li', function(){
+        var project_id = $(this).closest('li').html();
+        $('#input_text').val(project_id);
+        document.forms.search_form.submit();
+        return false;
+    });
+
+
+    $(document).mouseup(function (e){
+        var container1 = $("#ajaxdiv");
+        var container2 = $("#input_text");
+
+        if (!container2.is(e.target) // if the target of the click isn't the container...
+            && container2.has(e.target).length === 0) // ... nor a descendant of the container
+        {
+            $('#ajaxdiv').css({
+                'display': 'none'
+            });
+        }
+        else {
+            $('#ajaxdiv').css({
+                'display': 'block'
+            });
+        }
+
+        /*if (container2.is(e.target))
+        {
+            $('#ajaxdiv').css({
+                'display': 'block'
+            });
+        }*/
+    });
+
+});
